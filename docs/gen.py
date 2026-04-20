@@ -27,7 +27,7 @@ def _du(path):
 
 def _timer_active():
     try:
-        r = subprocess.run(["systemctl", "is-active", "mend-backup.timer"],
+        r = subprocess.run(["systemctl", "--user", "is-active", "mend-backup.timer"],
                            capture_output=True, text=True)
         return r.stdout.strip() == "active"
     except Exception:
