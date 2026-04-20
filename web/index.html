@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>mend · dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #fff5f8;
+      --surface: #fdf0f5;
+      --border:  #f0c4d8;
+      --accent:  #c084a0;
+      --muted:   #d4a0b8;
+      --text:    #7a3050;
+      --ok:      #6dbf8a;
+      --fail:    #e07070;
+      --warn:    #e0b060;
+      --code-bg: #f5e8ef;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:      #1a0d12;
+        --surface: #2a1520;
+        --border:  #6a3050;
+        --accent:  #f0a0c0;
+        --muted:   #a07088;
+        --text:    #f0d0e0;
+        --ok:      #5aaf78;
+        --fail:    #d06060;
+        --warn:    #c09040;
+        --code-bg: #3a1f2a;
+      }
+    }
+
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    header { padding: 2rem 1.5rem 1rem; max-width: 900px; margin: 0 auto; display: flex; align-items: baseline; gap: 1rem; }
+    header h1 { font-size: 1.6rem; font-weight: 600; color: var(--accent); }
+    header .sub { font-size: 0.8rem; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+    #gen-time { margin-left: auto; font-size: 0.75rem; color: var(--muted); }
+
+    main { max-width: 900px; margin: 0 auto; padding: 0 1.5rem 3rem; display: grid; gap: 1rem; }
+
+    section { background: var(--surface); border: 0.5px solid var(--border); border-radius: 14px; padding: 1.2rem 1.4rem; }
+    section h2 { font-size: 0.72rem; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); margin-bottom: 1rem; }
+
+    /* stat row */
+    .stats { display: flex; flex-wrap: wrap; gap: 1rem; }
+    .stat { flex: 1 1 140px; }
+    .stat .val { font-size: 1.4rem; font-weight: 600; color: var(--accent); }
+    .stat .lbl { font-size: 0.75rem; color: var(--muted); margin-top: 2px; }
+
+    /* pill */
+    .pill { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; letter-spacing: 0.5px; }
+    .pill.ok   { background: color-mix(in srgb, var(--ok) 15%, transparent);   color: var(--ok); }
+    .pill.fail { background: color-mix(in srgb, var(--fail) 15%, transparent); color: var(--fail); }
+    .pill.warn { background: color-mix(in srgb, var(--warn) 15%, transparent); color: var(--warn); }
+    .pill.none { background: color-mix(in srgb, var(--muted) 15%, transparent); color: var(--muted); }
+
+    /* check list */
+    .check-list { display: flex; flex-direction: column; gap: 6px; }
+    .check-row { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; }
+    .check-row .icon { font-size: 1rem; width: 1.2rem; text-align: center; }
+    .check-row .name { flex: 1; }
+    .check-row .reason { font-size: 0.75rem; color: var(--muted); }
+
+    /* sync grid */
+    .sync-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+    .sync-card { border: 0.5px solid var(--border); border-radius: 10px; padding: 0.8rem 1rem; }
+    .sync-card .sc-label { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+    .sync-card .sc-val { font-size: 0.88rem; color: var(--text); word-break: break-all; }
+
+    /* packages */
+    .pkg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .pkg-chip { background: var(--code-bg); border-radius: 6px; padding: 2px 8px; font-size: 0.75rem; color: var(--muted); font-family: monospace; }
+
+    /* log list */
+    .log-list { display: flex; flex-direction: column; gap: 6px; }
+    .log-row { font-size: 0.82rem; display: flex; gap: 10px; align-items: flex-start; }
+    .log-row .ts { color: var(--muted); white-space: nowrap; font-size: 0.72rem; padding-top: 2px; }
+    .log-row .msg { flex: 1; }
+    .log-row .fix { font-size: 0.72rem; color: var(--ok); margin-top: 2px; }
+
+    /* guide */
+    .guide { display: flex; flex-direction: column; gap: 1rem; }
+    .guide-step { display: flex; gap: 12px; }
+    .guide-step .num { width: 24px; height: 24px; border-radius: 50%; background: var(--border); color: var(--accent); font-size: 0.75rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-top: 1px; }
+    .guide-step .body { flex: 1; }
+    .guide-step .body p { font-size: 0.85rem; margin-bottom: 4px; }
+    pre { background: var(--code-bg); border-radius: 8px; padding: 0.6rem 0.9rem; font-size: 0.78rem; overflow-x: auto; color: var(--text); font-family: monospace; }
+
+    .empty { color: var(--muted); font-size: 0.82rem; font-style: italic; }
+
+    #loading { text-align: center; padding: 4rem; color: var(--muted); }
+    #error-msg { display: none; text-align: center; padding: 4rem; color: var(--fail); }
+  </style>
+</head>
+<body>
+<header>
+  <h1>mend</h1>
+  <span class="sub">system dashboard</span>
+  <span id="gen-time"></span>
+</header>
+<main id="app">
+  <div id="loading">loading data.json…</div>
+  <div id="error-msg">Could not load data.json — run <code>python3 web/gen.py</code> first.</div>
+</main>
+
+<script>
+const fmt = ts => ts ? new Date(ts * 1000).toLocaleString() : '—';
+const ago = ts => {
+  if (!ts) return '—';
+  const s = Math.floor(Date.now() / 1000 - ts);
+  if (s < 60)   return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+};
+const bytes = b => {
+  if (!b) return '—';
+  if (b > 1e9) return (b/1e9).toFixed(1) + ' GB';
+  if (b > 1e6) return (b/1e6).toFixed(1) + ' MB';
+  return (b/1e3).toFixed(0) + ' KB';
+};
+const pill = (ok, yes='ok', no='fail', na='none') =>
+  ok == null ? `<span class="pill ${na}">—</span>`
+             : `<span class="pill ${ok ? yes : no}">${ok ? '✓ ok' : '✗ fail'}</span>`;
+
+function render(d) {
+  const app = document.getElementById('app');
+  app.innerHTML = '';
+
+  document.getElementById('gen-time').textContent = 'generated ' + ago(d.generated_at);
+
+  // ── 1. Last Backup ────────────────────────────────────────────────────────
+  const lb = d.last_backup;
+  const backupOk = !!lb.ts;
+  app.innerHTML += `
+  <section>
+    <h2>📦 Last Backup</h2>
+    <div class="stats">
+      <div class="stat">
+        <div class="val">${lb.ts ? ago(lb.ts) : '—'}</div>
+        <div class="lbl">last backup</div>
+      </div>
+      <div class="stat">
+        <div class="val">${lb.backup_dir_size || '—'}</div>
+        <div class="lbl">backup size</div>
+      </div>
+      <div class="stat">
+        <div class="val">${lb.timer_active ? '✓ active' : '✗ off'}</div>
+        <div class="lbl">auto-schedule (3-day)</div>
+      </div>
+      <div class="stat">
+        <div class="val">${lb.task || '—'}</div>
+        <div class="lbl">last task</div>
+      </div>
+    </div>
+    ${lb.ts ? `<p style="margin-top:10px;font-size:0.78rem;color:var(--muted)">${fmt(lb.ts)}${lb.snapshot ? ' · ' + lb.snapshot : ''}</p>` : ''}
+  </section>`;
+
+  // ── 2. Sync Health ────────────────────────────────────────────────────────
+  const sy = d.sync;
+  app.innerHTML += `
+  <section>
+    <h2>🔄 Sync Health</h2>
+    <div class="sync-grid">
+      <div class="sync-card">
+        <div class="sc-label">GitHub last push</div>
+        <div class="sc-val">${sy.github_last_push || '—'}</div>
+      </div>
+      <div class="sync-card">
+        <div class="sc-label">Local snapshots</div>
+        <div class="sc-val">${sy.local_snapshots}</div>
+      </div>
+      <div class="sync-card">
+        <div class="sc-label">External targets</div>
+        <div class="sc-val">${sy.external_targets.length ? sy.external_targets.join(', ') : '—'}</div>
+      </div>
+    </div>
+    ${sy.snapshots.length ? `
+    <div style="margin-top:12px">
+      <div style="font-size:0.72rem;color:var(--muted);margin-bottom:6px">Recent snapshots</div>
+      <div class="check-list">
+        ${sy.snapshots.slice(0,5).map(s => `
+          <div class="check-row">
+            <span class="icon">💾</span>
+            <span class="name" style="font-family:monospace;font-size:0.78rem">${s.name}</span>
+            <span class="reason">${bytes(s.size)}</span>
+          </div>`).join('')}
+      </div>
+    </div>` : ''}
+  </section>`;
+
+  // ── 3. Installed Apps ─────────────────────────────────────────────────────
+  const pk = d.packages;
+  app.innerHTML += `
+  <section>
+    <h2>🧩 Installed Packages</h2>
+    <div class="stats">
+      <div class="stat">
+        <div class="val">${pk.count}</div>
+        <div class="lbl">total packages</div>
+      </div>
+    </div>
+    <div class="pkg-chips">
+      ${pk.sample.map(p => `<span class="pkg-chip">${p}</span>`).join('')}
+      ${pk.count > pk.sample.length ? `<span class="pkg-chip">+${pk.count - pk.sample.length} more</span>` : ''}
+    </div>
+  </section>`;
+
+  // ── 4. System Health ──────────────────────────────────────────────────────
+  const h = d.health;
+  const checks = h.checks || [];
+  app.innerHTML += `
+  <section>
+    <h2>🛠 System Health</h2>
+    <div class="stats" style="margin-bottom:${checks.length ? '1rem' : '0'}">
+      <div class="stat">
+        <div class="val" style="color:var(--ok)">${h.passed}</div>
+        <div class="lbl">passed</div>
+      </div>
+      <div class="stat">
+        <div class="val" style="color:${h.failed ? 'var(--fail)' : 'var(--ok)'}">${h.failed}</div>
+        <div class="lbl">failed</div>
+      </div>
+      <div class="stat">
+        <div class="val">${h.cycles}</div>
+        <div class="lbl">cycles run</div>
+      </div>
+      <div class="stat">
+        <div class="val">${h.last_run ? ago(h.last_run) : '—'}</div>
+        <div class="lbl">last check</div>
+      </div>
+    </div>
+    ${checks.length ? `
+    <div class="check-list">
+      ${checks.map(c => `
+        <div class="check-row">
+          <span class="icon">${c.ok ? '✅' : (c.severity === 'critical' ? '🔴' : '⚠️')}</span>
+          <span class="name">${c.name}</span>
+          ${!c.ok ? `<span class="reason">${c.reason || ''}</span>` : ''}
+          ${c.corrected ? `<span class="pill ok" style="font-size:0.65rem">auto-fixed</span>` : ''}
+        </div>`).join('')}
+    </div>` : `<p class="empty">No health checks recorded yet — run <code>mend check</code>.</p>`}
+  </section>`;
+
+  // ── 5. Recent Errors / Fixes ──────────────────────────────────────────────
+  const errs    = d.errors    || [];
+  const fixes   = d.corrections || [];
+  const combined = [
+    ...errs.map(e => ({ ts: e.ts, type: 'error', msg: `[${e.op}] ${e.reason || 'failed'}` })),
+    ...fixes.map(f => ({ ts: f.ts, type: 'fix', msg: `[${f.check}] ${f.snapshot ? 'snapshot taken' : 'correction applied'}`, fix: f.fixed ? 'fixed ✓' : 'fix failed' })),
+  ].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 20);
+
+  app.innerHTML += `
+  <section>
+    <h2>📋 Recent Errors / Fixes</h2>
+    ${combined.length ? `
+    <div class="log-list">
+      ${combined.map(e => `
+        <div class="log-row">
+          <span class="ts">${ago(e.ts)}</span>
+          <div class="msg">
+            <span class="pill ${e.type === 'fix' ? 'ok' : 'fail'}" style="margin-right:6px">${e.type}</span>${e.msg}
+            ${e.fix ? `<div class="fix">${e.fix}</div>` : ''}
+          </div>
+        </div>`).join('')}
+    </div>` : `<p class="empty">No errors recorded yet.</p>`}
+  </section>`;
+
+  // ── 6. Install / Restore Guide ────────────────────────────────────────────
+  app.innerHTML += `
+  <section>
+    <h2>📖 How to Install / Restore</h2>
+    <div class="guide">
+      <div class="guide-step">
+        <div class="num">1</div>
+        <div class="body">
+          <p>Clone the repo</p>
+          <pre>git clone https://github.com/Ivoryy06/mend.git ~/mend</pre>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="num">2</div>
+        <div class="body">
+          <p>Add <code>mend</code> to your PATH</p>
+          <pre>sudo ln -s ~/mend/mend /usr/local/bin/mend</pre>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="num">3</div>
+        <div class="body">
+          <p>Install the 3-day auto-backup timer (run once)</p>
+          <pre>mend schedule</pre>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="num">4</div>
+        <div class="body">
+          <p>Take your first backup</p>
+          <pre>mend backup</pre>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="num">5</div>
+        <div class="body">
+          <p>Restore from last backup (on a new or broken machine)</p>
+          <pre>mend recover</pre>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="num">6</div>
+        <div class="body">
+          <p>Rollback to last verified good state</p>
+          <pre>mend lkg</pre>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="num">7</div>
+        <div class="body">
+          <p>Start continuous health monitoring</p>
+          <pre>mend watch</pre>
+        </div>
+      </div>
+      <div class="guide-step">
+        <div class="num">8</div>
+        <div class="body">
+          <p>Regenerate this dashboard</p>
+          <pre>python3 ~/mend/web/gen.py</pre>
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+
+fetch('data.json?t=' + Date.now())
+  .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+  .then(d => {
+    document.getElementById('loading').remove();
+    render(d);
+  })
+  .catch(() => {
+    document.getElementById('loading').remove();
+    document.getElementById('error-msg').style.display = 'block';
+  });
+</script>
+</body>
+</html>

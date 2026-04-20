@@ -1,0 +1,52 @@
+{
+  "generated_at": 1776688417.3161416,
+  "last_backup": {
+    "ts": null,
+    "task": null,
+    "snapshot": null,
+    "size": null,
+    "backup_dir_size": null,
+    "timer_active": false
+  },
+  "sync": {
+    "github_last_push": null,
+    "local_snapshots": 0,
+    "snapshots": [],
+    "external_targets": []
+  },
+  "packages": {
+    "count": 1734,
+    "sample": [
+      "aalib",
+      "abseil-cpp",
+      "accounts-qml-module",
+      "accountsservice",
+      "acl",
+      "ada",
+      "adw-gtk-theme",
+      "adwaita-cursors",
+      "adwaita-fonts",
+      "adwaita-icon-theme",
+      "adwaita-icon-theme-legacy",
+      "alacritty",
+      "alsa-card-profiles",
+      "alsa-firmware",
+      "alsa-lib",
+      "alsa-plugins",
+      "alsa-topology-conf",
+      "alsa-ucm-conf",
+      "alsa-utils",
+      "android-tools"
+    ]
+  },
+  "health": {
+    "last_run": null,
+    "cycles": 0,
+    "checks": [],
+    "passed": 0,
+    "failed": 0
+  },
+  "corrections": [],
+  "errors": [],
+  "history": []
+}
