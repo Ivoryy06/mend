@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# kiro recover — restore system from last backup via mend
+set -euo pipefail
+
+MEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+case "${1:-recover}" in
+  recover)
+    exec python3 "$MEND_DIR/main.py" --task "Recover"
+    ;;
+  backup)
+    exec python3 "$MEND_DIR/main.py" --task "Backup"
+    ;;
+  backup-github)
+    exec python3 "$MEND_DIR/main.py" --task "Backup + GitHub"
+    ;;
+  schedule)
+    exec python3 "$MEND_DIR/main.py" --task "Setup Backup Schedule"
+    ;;
+  *)
+    echo "Usage: kiro <recover|backup|backup-github|schedule>"
+    exit 1
+    ;;
+esac

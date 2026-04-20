@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# mend — AI-assisted backup and recovery tool
+# Kiro CLI drives the process: runs operations, checks errors, explains results.
+set -euo pipefail
+
+MEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+KIRO="kiro-cli"
+BACKUP_DIR="$HOME/backup"
+
+_kiro_chat() {
+    local prompt="$1"
+    "$KIRO" chat \
+        --agent default \
+        --trust-all-tools \
+        --no-interactive \
+        "$prompt"
+}
+
+_context() {
+    # Give Kiro the project path and relevant state so it has full context
+    echo "You are assisting with the 'mend' system recovery tool located at $MEND_DIR. "
+    echo "The backup directory is $BACKUP_DIR. "
+    echo "Use the tools available to you to run commands, read files, and check results. "
+    echo "Explain everything in plain English suitable for a non-technical user. "
+    echo "Be concise. If something fails, explain why and what to do next."
+}
+
+CMD="${1:-help}"
+
+case "$CMD" in
+  recover)
+    _kiro_chat "$(_context) The user wants to recover their system from the last backup. Run: python3 $MEND_DIR/main.py --task Recover — then check the output for errors and report the result clearly to the user."
+    ;;
+  backup)
+    _kiro_chat "$(_context) The user wants to back up their system now to $BACKUP_DIR. Run: python3 $MEND_DIR/main.py --task Backup — then check the output for errors and report the result clearly."
+    ;;
+  backup-github)
+    _kiro_chat "$(_context) The user wants to back up their system and push configs to GitHub. Run: python3 $MEND_DIR/main.py --task 'Backup + GitHub' — then check the output for errors and report the result clearly."
+    ;;
+  schedule)
+    _kiro_chat "$(_context) The user wants to set up automatic backups every 3 days. Run: python3 $MEND_DIR/main.py --task 'Setup Backup Schedule' — then confirm it worked and explain what was set up in plain English."
+    ;;
+  status)
+    _kiro_chat "$(_context) The user wants to know the status of their backups. Run: python3 $MEND_DIR/main.py --history — then check if $BACKUP_DIR exists and how much space it uses (du -sh $BACKUP_DIR 2>/dev/null). Report everything in plain English: last backup time, whether it succeeded, disk usage, and whether auto-schedule is active (systemctl is-active mend-backup.timer 2>/dev/null)."
+    ;;
+  watch)
+    # continuous health check loop — run directly, no Kiro wrapper needed
+    exec python3 "$MEND_DIR/main.py" --watch --watch-interval "${2:-3600}"
+    ;;
+  check)
+    # single health check cycle
+    exec python3 "$MEND_DIR/main.py" --watch-once
+    ;;
+  snapshots)
+    exec python3 "$MEND_DIR/main.py" --snapshots
+    ;;
+  rollback)
+    if [ -z "${2:-}" ]; then
+      echo "Usage: mend rollback <snapshot-name>"
+      echo "Run 'mend snapshots' to list available snapshots."
+      exit 1
+    fi
+    exec python3 "$MEND_DIR/main.py" --rollback "$2"
+    ;;
+  lkg)
+    exec python3 "$MEND_DIR/main.py" --lkg
+    ;;
+  help|--help|-h)
+    cat <<'EOF'
+mend — AI-assisted system backup, recovery, and health monitoring
+
+  mend backup              Back up your system now
+  mend backup-github       Back up + push configs to GitHub
+  mend recover             Restore your system from last backup
+  mend schedule            Set up automatic backup every 3 days
+  mend status              Check backup status and history
+
+  mend watch               Start continuous health monitoring (hourly)
+  mend watch <interval>    Watch with custom interval in seconds
+  mend check               Run one health check cycle now
+  mend snapshots           List available rollback snapshots
+  mend rollback <name>     Roll back system to a named snapshot
+  mend lkg                 Roll back to last known good verified state
+EOF
+    ;;
+  *)
+    # Natural language fallback — let Kiro figure it out
+    _kiro_chat "$(_context) The user typed: '$*'. Figure out what they want and help them using the mend tool at $MEND_DIR."
+    ;;
+esac

@@ -19,6 +19,11 @@ Env = dict
 Check = Callable[[Env], Tuple[bool, str]]
 Action = Callable[[Env], str]   # returns captured output string
 
+# DeepValidate: optional callable that receives (env, op_output) and returns
+# (ok: bool, reason: str, verdict: str)
+# verdict must be one of: "done" | "retry" | "reapply" | "reinstall"
+DeepValidate = Callable[[Env, str], Tuple[bool, str, str]]
+
 
 @dataclass
 class Operation:
@@ -27,11 +32,12 @@ class Operation:
     preconditions: List[Check]
     action: Action
     postconditions: List[Check]
-    failure_class: str = "recoverable"   # 'fatal' | 'recoverable'
+    failure_class: str = "recoverable"   # 'system' | 'external' | 'recoverable'
     max_retries: int = 2
     tags: List[str] = field(default_factory=list)
     timeout: Optional[int] = None        # seconds; None = no limit
     parallel: bool = False               # safe for concurrent execution
+    deep_validate: Optional[DeepValidate] = None  # AI-driven deep validation
 
 
 # ── subprocess helpers ────────────────────────────────────────────────────────
@@ -85,7 +91,7 @@ def make_mount_op(name: str, device: str, mountpoint: str, fatal=True) -> Operat
         preconditions=[lambda env: (os.path.exists(device), f"device {device} not found")],
         action=action,
         postconditions=[lambda env: (os.path.ismount(mountpoint), f"{mountpoint} not a mountpoint")],
-        failure_class="fatal" if fatal else "recoverable",
+        failure_class="system" if fatal else "recoverable",
         max_retries=1,
         tags=["disk"],
     )
@@ -131,7 +137,7 @@ def make_copy_op(name: str, src: str, dst: str, fatal=False) -> Operation:
         preconditions=[_file_exists(src)],
         action=action,
         postconditions=[_file_exists(dst)],
-        failure_class="fatal" if fatal else "recoverable",
+        failure_class="system" if fatal else "recoverable",
         tags=["files"],
     )
 
@@ -152,7 +158,7 @@ def make_shell_op(name: str, description: str, cmd: list,
         preconditions=pre or [],
         action=action,
         postconditions=post or [],
-        failure_class="fatal" if fatal else "recoverable",
+        failure_class="system" if fatal else "recoverable",
         timeout=timeout,
         tags=tags or [],
         parallel=parallel,
@@ -200,8 +206,211 @@ def make_service_op(name: str, service: str, ensure: str = "active",
         action=action,
         postconditions=[_service_active(service) if ensure == "active"
                         else lambda env: (True, "")],
-        failure_class="fatal" if fatal else "recoverable",
+        failure_class="system" if fatal else "recoverable",
         tags=["service"],
+    )
+
+
+# ── AI deep validation ────────────────────────────────────────────────────────
+
+def make_ai_validator(context: str) -> "DeepValidate":
+    """
+    Returns a deep_validate function that asks Kiro CLI to inspect the result
+    of an operation and decide: done | retry | reapply | reinstall.
+
+    context: plain-English description of what correctness looks like,
+             e.g. "nginx config is valid and port 80 is listening"
+    """
+    import json as _json
+
+    def validator(env: dict, op_output: str) -> tuple[bool, str, str]:
+        kiro = shutil.which("kiro-cli")
+        if not kiro:
+            # no Kiro available — pass through
+            return True, "kiro-cli not available, skipping deep validation", "done"
+
+        mend_dir = os.path.dirname(os.path.abspath(__file__))
+        env_summary = {
+            k: env[k] for k in
+            ("distro", "kernel", "init", "pkg_manager", "internet",
+             "disk", "memory", "services", "processes")
+            if k in env
+        }
+
+        prompt = (
+            "You are a system validation agent for the 'mend' recovery tool. "
+            "An operation just completed. Inspect the system and decide if it succeeded correctly.\n\n"
+            f"What correctness means for this operation:\n{context}\n\n"
+            f"Operation output:\n{op_output or '(none)'}\n\n"
+            f"Current environment snapshot:\n{_json.dumps(env_summary, indent=2)}\n\n"
+            "Use available tools to inspect files, run commands, and check behavior. "
+            "Then respond with ONLY a JSON object on a single line, like:\n"
+            '{"ok": true, "reason": "nginx is running and port 80 responds", "verdict": "done"}\n\n'
+            "verdict must be one of:\n"
+            "  done      — everything is correct, continue\n"
+            "  retry     — transient issue, retry the operation as-is\n"
+            "  reapply   — config/state is wrong, reapply the operation with fixes\n"
+            "  reinstall — package/binary is broken, remove and reinstall\n\n"
+            "Respond with only the JSON line, nothing else."
+        )
+
+        result = subprocess.run(
+            [kiro, "chat", "--trust-all-tools", "--no-interactive", prompt],
+            capture_output=True, text=True, cwd=mend_dir,
+        )
+
+        # extract the last JSON line from Kiro's output
+        for line in reversed(result.stdout.strip().splitlines()):
+            line = line.strip()
+            if line.startswith("{") and line.endswith("}"):
+                try:
+                    data = _json.loads(line)
+                    ok      = bool(data.get("ok", True))
+                    reason  = str(data.get("reason", ""))
+                    verdict = str(data.get("verdict", "done"))
+                    if verdict not in ("done", "retry", "reapply", "reinstall"):
+                        verdict = "done" if ok else "retry"
+                    return ok, reason, verdict
+                except _json.JSONDecodeError:
+                    continue
+
+        # Kiro returned something unparseable — treat as pass
+        return True, "deep validation response unparseable, assuming ok", "done"
+
+    return validator
+
+
+# ── multi-pass app testing ────────────────────────────────────────────────────
+
+def make_app_test_op(
+    name: str,
+    cmd: list,
+    *,
+    run_for: float = 3.0,
+    expect_in_output: list = None,
+    expect_exit_zero: bool = False,
+    install_cmd: list = None,
+    uninstall_cmd: list = None,
+    error_threshold: int = 3,
+    tags: list = None,
+) -> Operation:
+    """
+    Multi-pass test for an external application.
+
+    Launches `cmd`, lets it run for `run_for` seconds, then inspects:
+      - exit code (if expect_exit_zero)
+      - stdout/stderr for expected strings (expect_in_output)
+      - crash signals (returncode < 0)
+
+    A persistent _error_counter tracks failures across retries.
+    At error_threshold failures, Kiro is asked to diagnose; if it
+    recommends reinstall, uninstall_cmd + install_cmd are run before
+    the next attempt. After that, the counter resets.
+
+    max_retries is set to error_threshold * 2 to allow retry + reinstall cycles.
+    """
+    _counter: dict = {"errors": 0, "reinstalled": False}
+
+    def _detect_misbehavior(proc: subprocess.Popen, stdout: str, stderr: str) -> Optional[str]:
+        combined = (stdout + stderr).strip()
+        if proc.returncode is not None and proc.returncode < 0:
+            return f"crashed with signal {-proc.returncode}"
+        if expect_exit_zero and proc.returncode not in (None, 0):
+            return f"exited with code {proc.returncode}"
+        if expect_in_output:
+            missing = [s for s in expect_in_output if s not in combined]
+            if missing:
+                return f"expected output missing: {missing}"
+        # heuristic: common crash/error patterns in output
+        for pattern in ("segfault", "core dumped", "killed", "error:", "fatal:", "exception"):
+            if pattern in combined.lower():
+                return f"misbehavior detected in output: '{pattern}'"
+        return None
+
+    def _reinstall(env: Env) -> str:
+        logs = []
+        if uninstall_cmd:
+            ok, out = _run(uninstall_cmd, timeout=60)
+            logs.append(f"uninstall: {out}")
+        if install_cmd:
+            ok, out = _run(install_cmd, timeout=120)
+            if not ok:
+                raise RuntimeError(f"reinstall failed: {out}")
+            logs.append(f"install: {out}")
+        return "\n".join(logs)
+
+    def _kiro_diagnose(error: str, stdout: str, stderr: str) -> str:
+        """Ask Kiro to diagnose and return 'reinstall' or 'retry'."""
+        kiro = shutil.which("kiro-cli")
+        if not kiro:
+            return "retry"
+        mend_dir = os.path.dirname(os.path.abspath(__file__))
+        prompt = (
+            f"Application test failed for command: {' '.join(cmd)}\n"
+            f"Error: {error}\n"
+            f"stdout: {stdout[-1000:]}\nstderr: {stderr[-1000:]}\n\n"
+            "Diagnose the failure. Respond with ONLY one word: reinstall or retry."
+        )
+        r = subprocess.run(
+            [kiro, "chat", "--trust-all-tools", "--no-interactive", prompt],
+            capture_output=True, text=True, cwd=mend_dir,
+        )
+        out = r.stdout.strip().lower()
+        return "reinstall" if "reinstall" in out else "retry"
+
+    def action(env: Env) -> str:
+        binary = cmd[0]
+        if not shutil.which(binary):
+            raise RuntimeError(f"binary not found: {binary}")
+
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        try:
+            stdout, stderr = proc.communicate(timeout=run_for)
+        except subprocess.TimeoutExpired:
+            # still running after run_for seconds — that's expected for daemons
+            proc.kill()
+            stdout, stderr = proc.communicate()
+            proc.returncode = 0  # treat timeout as "ran without crashing"
+
+        error = _detect_misbehavior(proc, stdout, stderr)
+
+        if error:
+            _counter["errors"] += 1
+            if _counter["errors"] >= error_threshold:
+                verdict = _kiro_diagnose(error, stdout, stderr)
+                if verdict == "reinstall" and (install_cmd or uninstall_cmd):
+                    reinstall_out = _reinstall(env)
+                    _counter["errors"] = 0
+                    _counter["reinstalled"] = True
+                    raise RuntimeError(
+                        f"reinstalled after {error_threshold} failures ({error})\n{reinstall_out}"
+                    )
+            raise RuntimeError(
+                f"[pass {_counter['errors']}/{error_threshold}] {error}\n"
+                f"stdout: {stdout[-500:]}\nstderr: {stderr[-500:]}"
+            )
+
+        _counter["errors"] = 0  # clean pass resets counter
+        return (
+            f"app test passed (errors reset to 0, reinstalled={_counter['reinstalled']})\n"
+            f"stdout: {stdout[:500]}"
+        )
+
+    return Operation(
+        name=name,
+        description=f"Multi-pass test: {' '.join(cmd)}",
+        preconditions=[lambda env, b=cmd[0]: (shutil.which(b) is not None, f"{b} not found")],
+        action=action,
+        postconditions=[],
+        failure_class="external",
+        max_retries=error_threshold * 2,
+        tags=(tags or []) + ["app-test"],
     )
 
 
