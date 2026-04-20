@@ -8,11 +8,13 @@ Kiro CLI is the intelligent layer — it drives operations, diagnoses failures, 
 ## Quick Start
 
 ```bash
-sudo ln -s ~/mend/mend /usr/local/bin/mend
-mend schedule        # install 3-day auto-backup timer (run once)
+sudo ln -sf ~/mend/mend /usr/local/bin/mend
+mend schedule        # install 3-day auto-backup timer (run once, no sudo needed)
 ```
 
 After that, the system backs up automatically. Everything else is on-demand.
+
+The timer runs as your user (`~/.config/systemd/user/mend-backup.timer`) — no root required.
 
 ---
 

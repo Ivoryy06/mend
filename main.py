@@ -202,9 +202,12 @@ def _make_recover_op() -> Operation:
 
 
 def _make_schedule_op() -> Operation:
-    """Install a systemd timer that runs backup every 3 days."""
+    """Install a systemd user timer that runs backup every 3 days."""
     def action(env) -> str:
-        mend_path = os.path.abspath(__file__)
+        mend_path = os.path.realpath(__file__)
+        unit_dir = os.path.expanduser("~/.config/systemd/user")
+        os.makedirs(unit_dir, exist_ok=True)
+
         service = f"""[Unit]
 Description=mend auto backup
 
@@ -222,22 +225,22 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 """
-        svc_path = "/etc/systemd/system/mend-backup.service"
-        tmr_path = "/etc/systemd/system/mend-backup.timer"
+        svc_path = os.path.join(unit_dir, "mend-backup.service")
+        tmr_path = os.path.join(unit_dir, "mend-backup.timer")
         with open(svc_path, "w") as f:
             f.write(service)
         with open(tmr_path, "w") as f:
             f.write(timer)
-        subprocess.run(["systemctl", "daemon-reload"], check=True)
-        subprocess.run(["systemctl", "enable", "--now", "mend-backup.timer"], check=True)
+        subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+        subprocess.run(["systemctl", "--user", "enable", "--now", "mend-backup.timer"], check=True)
         return f"Timer installed: {tmr_path}"
 
     return Operation(
         name="setup_backup_schedule",
-        description="Install systemd timer: backup every 3 days",
+        description="Install systemd user timer: backup every 3 days",
         preconditions=[lambda env: (shutil.which("systemctl") is not None, "systemctl not found")],
         action=action,
-        postconditions=[lambda env: (os.path.exists("/etc/systemd/system/mend-backup.timer"), "timer file missing")],
+        postconditions=[lambda env: (os.path.exists(os.path.expanduser("~/.config/systemd/user/mend-backup.timer")), "timer file missing")],
         failure_class="recoverable",
         max_retries=1,
         tags=["backup", "schedule"],

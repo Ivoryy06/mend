@@ -227,7 +227,8 @@ def _display_info() -> dict:
                           or os.environ.get("DISPLAY") and "x11" or "none",
         "desktop":        os.environ.get("XDG_CURRENT_DESKTOP", ""),
         "session_type":   os.environ.get("XDG_SESSION_TYPE", ""),
-        "resolution":     _run(["xdpyinfo"]).split("dimensions:")[1].split()[0]
+        "resolution":     (lambda p: p[1].split()[0] if len(p) > 1 and p[1].split() else "")(
+                              _run(["xdpyinfo"]).split("dimensions:"))
                           if shutil.which("xdpyinfo") and os.environ.get("DISPLAY") else "",
     }
 
