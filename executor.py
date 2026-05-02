@@ -20,7 +20,7 @@ import time, threading, sys, os, subprocess, shutil
 from typing import List
 from ui import failure_menu
 
-# Patterns that flag an operation as requiring explicit user confirmation
+
 _RISKY_PATTERNS = (
     "rm ", "rm\t", "rm\n", "rmdir",
     "mv ", "mv\t",
@@ -47,7 +47,7 @@ def _confirm(op: Operation) -> bool:
     return answer == "y"
 
 
-# ── failure recovery ──────────────────────────────────────────────────────────
+
 
 def _kiro_autofix(op: Operation, error: str, output: str) -> bool:
     """
@@ -87,7 +87,7 @@ def _pause_on_failure(op: Operation, error: str, output: str, state: StateManage
     if is_tty:
         choice = failure_menu(op.name, fc, error, output)
     else:
-        # non-interactive fallback (pipe / CI)
+        
         print(f"\n❌ [{fc}] {op.name}: {error}")
         choice = "abort"
 
@@ -95,10 +95,10 @@ def _pause_on_failure(op: Operation, error: str, output: str, state: StateManage
         fixed = _kiro_autofix(op, error, output)
         if fixed:
             return "retry"
-        # autofix failed — for system class still no skip
+        
         if fc == "system":
             return _pause_on_failure(op, error + " [autofix failed]", output, state)
-        # fall through to another menu pass
+        
         return _pause_on_failure(op, error + " [autofix failed]", output, state)
 
     elif choice == "manual":
@@ -108,11 +108,11 @@ def _pause_on_failure(op: Operation, error: str, output: str, state: StateManage
 
     elif choice == "skip":
         if fc == "system":
-            # system failures cannot be skipped — loop back
+            
             return _pause_on_failure(op, error, output, state)
         return "skip"
 
-    else:  # abort
+    else:  
         state._state["status"] = "interrupted"
         state.save()
         return "abort"
@@ -146,7 +146,7 @@ class Executor:
         if op.name not in s.pending:
             return
 
-        # ── preconditions ─────────────────────────────────────────────────────
+        
         ok, reason = self._check_all(op.preconditions, env)
         if not ok:
             if op.failure_class in ("system", "fatal"):
@@ -158,19 +158,19 @@ class Executor:
                 s.mark_skipped(op.name, reason)
             return
 
-        # ── dry-run ───────────────────────────────────────────────────────────
+        
         if self.dry_run:
             self._emit("dry", op.name, f"would run: {op.description}")
             s.mark_skipped(op.name, "dry-run")
             return
 
-        # ── authorization gate ────────────────────────────────────────────────
+        
         if _is_risky(op) and not _confirm(op):
             self._emit("skip", op.name, "declined by user")
             s.mark_skipped(op.name, "declined by user")
             return
 
-        # ── action + retry loop ───────────────────────────────────────────────
+        
         s.op_start(op.name)
         success = False
         last_err = ""
@@ -186,15 +186,15 @@ class Executor:
                 fresh = snapshot()
                 ok, reason = self._check_all(op.postconditions, fresh)
                 if ok:
-                    # ── deep validation (AI-driven) ───────────────────────────
+                    
                     if op.deep_validate:
                         dv_ok, dv_reason, verdict = op.deep_validate(fresh, output)
                         if not dv_ok:
                             self._emit("retry", op.name, f"deep validation: {dv_reason} [{verdict}]")
                             last_err = f"deep validation failed ({verdict}): {dv_reason}"
-                            # map verdict to a retry signal; reinstall/reapply
-                            # are handled the same as retry here — the AI already
-                            # applied fixes during validation before returning
+                            
+                            
+                            
                             s.increment_retry(op.name)
                             attempt += 1
                             self._backoff(attempt)
@@ -219,7 +219,7 @@ class Executor:
             s.mark_done(op.name, output)
             return
 
-        # ── failure: pause and offer recovery options ─────────────────────────
+        
         is_interactive = sys.stdin.isatty()
 
         if op.failure_class in ("system", "fatal") and not is_interactive:
@@ -232,7 +232,7 @@ class Executor:
         decision = _pause_on_failure(op, last_err, output, s)
 
         if decision == "retry":
-            # reset retry counter and re-queue at front for a fresh attempt
+            
             s._state["retries"][op.name] = 0
             if op.name not in s._state["pending"]:
                 s._state["pending"].insert(0, op.name)
@@ -241,7 +241,7 @@ class Executor:
         elif decision == "skip":
             self._emit("skip", op.name, "skipped after failure")
             s.mark_skipped(op.name, f"skipped after failure: {last_err}")
-        else:  # abort
+        else:  
             self._emit("fatal", op.name, "aborted by user")
             s.mark_failed(op.name, last_err, output)
             self._fatal.set()

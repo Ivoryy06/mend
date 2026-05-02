@@ -1,0 +1,143 @@
+{
+  "task": "Backup",
+  "status": "failed",
+  "pending": [],
+  "done": [],
+  "failed": [
+    "backup_system"
+  ],
+  "skipped": [],
+  "retries": {
+    "backup_system": 2
+  },
+  "op_output": {},
+  "timings": {
+    "backup_system": 0.0
+  },
+  "started_at": 1776822171.0803087,
+  "log": [
+    {
+      "op": "backup_system",
+      "status": "failed",
+      "reason": "",
+      "ts": 1777684233.2762377,
+      "duration": 4.315376281738281e-05
+    },
+    {
+      "op": "__task__",
+      "status": "failed",
+      "reason": "fatal failure at backup_system",
+      "ts": 1777684233.2770007
+    }
+  ],
+  "history": [
+    {
+      "task": "Setup Backup Schedule",
+      "status": "done",
+      "started_at": 1776694495.1793447,
+      "finished_at": 1776694541.324028,
+      "done": 0,
+      "failed": 1,
+      "skipped": 0
+    },
+    {
+      "task": "Setup Backup Schedule",
+      "status": "done",
+      "started_at": 1776694635.2595897,
+      "finished_at": 1776694638.2591035,
+      "done": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "task": "Setup Backup Schedule",
+      "status": "done",
+      "started_at": 1776694702.4098856,
+      "finished_at": 1776694704.4332604,
+      "done": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "task": "Setup Backup Schedule",
+      "status": "done",
+      "started_at": 1776694778.0548975,
+      "finished_at": 1776694778.6635904,
+      "done": 0,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "task": "Backup",
+      "status": "done",
+      "started_at": 1776694782.8657713,
+      "finished_at": 1776694783.1685314,
+      "done": 0,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "task": "Recover",
+      "status": "failed",
+      "started_at": 1776694783.283264,
+      "finished_at": 1776694783.5899966,
+      "done": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "task": "Backup",
+      "status": "done",
+      "started_at": 1776694790.0696816,
+      "finished_at": 1776694790.4058194,
+      "done": 0,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "task": "Backup + GitHub",
+      "status": "done",
+      "started_at": 1776694790.5402136,
+      "finished_at": 1776694791.1733453,
+      "done": 0,
+      "failed": 0,
+      "skipped": 2
+    },
+    {
+      "task": "Full Recovery",
+      "status": "done",
+      "started_at": 1776694791.28904,
+      "finished_at": 1776694792.1984808,
+      "done": 0,
+      "failed": 0,
+      "skipped": 3
+    },
+    {
+      "task": "Verify Only",
+      "status": "done",
+      "started_at": 1776694792.3227262,
+      "finished_at": 1776694792.8988152,
+      "done": 0,
+      "failed": 0,
+      "skipped": 2
+    },
+    {
+      "task": "Recover",
+      "status": "done",
+      "started_at": 1776694828.0168238,
+      "finished_at": 1776694828.4328766,
+      "done": 0,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "task": "Backup",
+      "status": "failed",
+      "started_at": 1776822171.0803087,
+      "finished_at": 1777684233.2770102,
+      "done": 0,
+      "failed": 1,
+      "skipped": 0
+    }
+  ]
+}

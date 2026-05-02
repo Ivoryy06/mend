@@ -50,7 +50,7 @@ _FC_LABEL = {
     "system":      ("SYS",  _C_FAIL),
     "external":    ("EXT",  _C_WARN),
     "recoverable": ("REC",  _C_DIM),
-    "fatal":       ("SYS",  _C_FAIL),   # legacy alias
+    "fatal":       ("SYS",  _C_FAIL),   
 }
 
 
@@ -61,7 +61,7 @@ def _init_colors():
     curses.init_pair(_C_STATUS,   curses.COLOR_WHITE,  -1)
     curses.init_pair(_C_DONE,     curses.COLOR_GREEN,  -1)
     curses.init_pair(_C_FAIL,     curses.COLOR_RED,    -1)
-    curses.init_pair(_C_DIM,      8,                   -1)   # dark grey
+    curses.init_pair(_C_DIM,      8,                   -1)   
     curses.init_pair(_C_WARN,     curses.COLOR_YELLOW, -1)
     curses.init_pair(_C_BORDER,   curses.COLOR_CYAN,   -1)
 
@@ -79,7 +79,7 @@ def _safe_addstr(win, y, x, text, attr=0):
         pass
 
 
-# ── Logger ────────────────────────────────────────────────────────────────────
+
 
 class Logger:
     def __init__(self, max_lines: int = 500):
@@ -136,7 +136,7 @@ class Logger:
                 return
 
 
-# ── Live execution panel (used during task run) ───────────────────────────────
+
 
 class LivePanel:
     def __init__(self, logger: Logger, state_fn: Callable[[], dict]):
@@ -188,7 +188,7 @@ class LivePanel:
             time.sleep(0.1)
 
 
-# ── Snapshot picker ───────────────────────────────────────────────────────────
+
 
 def pick_snapshot(snapshots: list) -> Optional[str]:
     """Arrow-key picker for rollback snapshots. Returns chosen path or None."""
@@ -225,7 +225,7 @@ def _snapshot_loop(stdscr, snapshots: list) -> Optional[str]:
             return None
 
 
-# ── Failure recovery menu (replaces text prompts in executor) ─────────────────
+
 
 def failure_menu(op_name: str, failure_class: str, error: str, output: str) -> str:
     """
@@ -263,13 +263,13 @@ def _failure_loop(stdscr, op_name, failure_class, error, output) -> str:
         stdscr.clear()
         h, w = stdscr.getmaxyx()
 
-        # header
+        
         _safe_addstr(stdscr, 0, 0,
                      f" ❌ [{fc_label}] {op_name}",
                      curses.color_pair(fc_color) | curses.A_BOLD)
         _safe_addstr(stdscr, 1, 0, "─" * (w - 1), curses.color_pair(_C_DIM))
 
-        # error + output (scrollable block)
+        
         lines = []
         for ln in error.splitlines():
             lines.append((" Error: " + ln, _C_FAIL))
@@ -311,7 +311,7 @@ def _failure_loop(stdscr, op_name, failure_class, error, output) -> str:
             return options[cursor][1]
 
 
-# ── Main Menu (split-pane) ────────────────────────────────────────────────────
+
 
 class Menu:
     """
@@ -334,8 +334,8 @@ class Menu:
         self._tag_idx    = 0
         self.cursor      = 0
         self.logger      = logger or Logger()
-        self.watchdog_fn = watchdog_fn  # returns list of CheckResult-like dicts
-        self._focus      = "menu"       # "menu" | "log"
+        self.watchdog_fn = watchdog_fn  
+        self._focus      = "menu"       
         self._log_scroll = 0
 
     def _active_tag(self) -> str:
@@ -367,7 +367,7 @@ class Menu:
         _safe_addstr(win, 1, 0, ("═" if focused else "─") * (w - 1),
                      curses.color_pair(_C_BORDER if focused else _C_DIM))
 
-        # scroll window so cursor stays visible
+        
         visible_h = h - 3
         start = max(0, self.cursor - visible_h + 1)
 
@@ -396,7 +396,7 @@ class Menu:
 
         visible_h = h - 3
         if not focused:
-            # auto-scroll to bottom when not focused
+            
             self._log_scroll = max(0, len(lines) - visible_h)
 
         for i, (ev, op, msg, ts) in enumerate(lines[self._log_scroll: self._log_scroll + visible_h]):
@@ -417,27 +417,27 @@ class Menu:
             stdscr.clear()
             h, w = stdscr.getmaxyx()
 
-            # title bar
+            
             _safe_addstr(stdscr, 0, 0, f" {self.title} — mend",
                          curses.color_pair(_C_TITLE) | curses.A_BOLD)
             self._draw_status_bar(stdscr, w)
             _safe_addstr(stdscr, 2, 0, "─" * (w - 1), curses.color_pair(_C_DIM))
 
-            # split: left 40%, right 60%
+            
             split   = max(24, w * 2 // 5)
             pane_h  = h - 5
 
             left_win  = stdscr.derwin(pane_h, split,         3, 0)
             right_win = stdscr.derwin(pane_h, w - split - 1, 3, split + 1)
 
-            # vertical divider
+            
             for row in range(3, 3 + pane_h):
                 _safe_addstr(stdscr, row, split, "│", curses.color_pair(_C_DIM))
 
             self._draw_menu_pane(left_win,  self._focus == "menu")
             self._draw_log_pane(right_win,  self._focus == "log")
 
-            # key hints
+            
             if self._focus == "menu":
                 hint = " ↑↓ nav  Enter run  Tab→log  t filter  w check  s snaps  p pause  r reset  q quit"
             else:
@@ -448,7 +448,7 @@ class Menu:
 
             key = stdscr.getch()
 
-            # ── log pane focused ──────────────────────────────────────────────
+            
             if self._focus == "log":
                 with self.logger._lock:
                     total = len(self.logger.lines)
@@ -461,11 +461,11 @@ class Menu:
                     self._log_scroll = max(0, self._log_scroll - visible_h)
                 elif key == curses.KEY_NPAGE:
                     self._log_scroll = min(max(0, total - visible_h), self._log_scroll + visible_h)
-                elif key in (9, 27):   # Tab or Esc
+                elif key in (9, 27):   
                     self._focus = "menu"
                 continue
 
-            # ── menu pane focused ─────────────────────────────────────────────
+            
             if key in (curses.KEY_UP, ord('k')):
                 self.cursor = max(0, self.cursor - 1)
                 while self.cursor > 0 and self.items[self.cursor].startswith("──"):
@@ -479,7 +479,7 @@ class Menu:
                     return self.items[self.cursor]
             elif key in (ord('q'), 27):
                 return None
-            elif key == 9:   # Tab
+            elif key == 9:   
                 self._focus = "log"
             elif key == ord('t'):
                 self._tag_idx += 1

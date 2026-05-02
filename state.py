@@ -45,7 +45,7 @@ _DEFAULTS = {
     "last_known_good": None,
 }
 
-# Verifier: callable(env) -> (ok: bool, reason: str)
+
 Verifier = Callable[[dict], tuple[bool, str]]
 
 
@@ -56,14 +56,14 @@ class StateManager:
         self._paused = False
         self._stop = False
         self._op_start: dict[str, float] = {}
-        # Verifiers run before a task result is accepted as "done"
+        
         self._verifiers: List[Verifier] = []
-        # External paths to sync snapshots to (USB, NAS, remote rsync target)
+        
         self.external_targets: List[str] = []
         signal.signal(signal.SIGINT, self._handle_interrupt)
         signal.signal(signal.SIGTERM, self._handle_interrupt)
 
-    # ── persistence ───────────────────────────────────────────────────────────
+    
 
     def _load(self) -> dict:
         if os.path.exists(self.path):
@@ -82,20 +82,20 @@ class StateManager:
         self._state = {**dict(_DEFAULTS), "history": history, "last_known_good": lkg}
         self.save()
 
-    # ── signal handling ───────────────────────────────────────────────────────
+    
 
     def _handle_interrupt(self, sig, frame):
         self._state["status"] = "interrupted"
         self.save()
         self._stop = True
 
-    # ── verifier registration ─────────────────────────────────────────────────
+    
 
     def add_verifier(self, fn: Verifier):
         """Register a verification function run before accepting task completion."""
         self._verifiers.append(fn)
 
-    # ── task lifecycle ────────────────────────────────────────────────────────
+    
 
     def start_task(self, task: str, ops: list):
         if self._state["task"] == task and self._state["status"] == "interrupted":
@@ -145,7 +145,7 @@ class StateManager:
             self._do_rollback()
             return False
 
-        # Verification passed — take a snapshot and record as last_known_good
+        
         snap_path = self._take_verified_snapshot()
         external  = self._sync_to_external(snap_path)
         self._state["last_known_good"] = {
@@ -178,7 +178,7 @@ class StateManager:
         self._state["status"] = "running"
         self.save()
 
-    # ── verified snapshot ─────────────────────────────────────────────────────
+    
 
     def _take_verified_snapshot(self) -> str:
         """rsync / → snapshots/verified-<timestamp>/ and return the path."""
@@ -198,7 +198,7 @@ class StateManager:
         )
         return dest
 
-    # ── external sync ─────────────────────────────────────────────────────────
+    
 
     def _sync_to_external(self, snap_path: str) -> List[str]:
         """
@@ -223,7 +223,7 @@ class StateManager:
                 print(f"   ⚠️  External sync to {target} error: {e}")
         return synced
 
-    # ── rollback ──────────────────────────────────────────────────────────────
+    
 
     def _do_rollback(self):
         """Roll back to last_known_good, trying external copies if local is missing."""
@@ -232,14 +232,14 @@ class StateManager:
             print("   No last_known_good recorded — cannot roll back automatically.")
             return
 
-        # Try local snapshot first
+        
         snap = lkg.get("snapshot", "")
         if snap and os.path.isdir(snap):
             print(f"   Rolling back to: {snap}")
             self._rsync_restore(snap)
             return
 
-        # Try external copies
+        
         for ext in lkg.get("external_copies", []):
             candidate = ext.rstrip("/") + "/" + os.path.basename(snap) + "/"
             print(f"   Local snapshot missing — trying external: {candidate}")
@@ -282,7 +282,7 @@ class StateManager:
         self._do_rollback()
         return True
 
-    # ── op tracking ───────────────────────────────────────────────────────────
+    
 
     def op_start(self, op: str):
         self._op_start[op] = time.time()
@@ -329,7 +329,7 @@ class StateManager:
     def retry_count(self, op: str) -> int:
         return self._state["retries"].get(op, 0)
 
-    # ── queries ───────────────────────────────────────────────────────────────
+    
 
     @property
     def status(self) -> str:
@@ -380,7 +380,7 @@ class StateManager:
     def log(self) -> list:
         return list(self._state.get("log", []))
 
-    # ── internal ──────────────────────────────────────────────────────────────
+    
 
     def _log_entry(self, op: str, status: str, reason: str = "", duration: float = None):
         entry = {"op": op, "status": status, "reason": reason, "ts": time.time()}
@@ -430,7 +430,7 @@ class StateManager:
         signal.signal(signal.SIGINT, self._handle_interrupt)
         signal.signal(signal.SIGTERM, self._handle_interrupt)
 
-    # ── persistence ───────────────────────────────────────────────────────────
+    
 
     def _load(self) -> dict:
         if os.path.exists(self.path):
@@ -448,14 +448,14 @@ class StateManager:
         self._state = {**dict(_DEFAULTS), "history": history}
         self.save()
 
-    # ── signal handling ───────────────────────────────────────────────────────
+    
 
     def _handle_interrupt(self, sig, frame):
         self._state["status"] = "interrupted"
         self.save()
         self._stop = True
 
-    # ── task lifecycle ────────────────────────────────────────────────────────
+    
 
     def start_task(self, task: str, ops: list):
         if self._state["task"] == task and self._state["status"] == "interrupted":
@@ -497,7 +497,7 @@ class StateManager:
         self._state["status"] = "running"
         self.save()
 
-    # ── op tracking ───────────────────────────────────────────────────────────
+    
 
     def op_start(self, op: str):
         self._op_start[op] = time.time()
@@ -509,7 +509,7 @@ class StateManager:
 
     def record_output(self, op: str, output: str):
         if output:
-            self._state["op_output"][op] = output[-4000:]  # cap at 4k chars
+            self._state["op_output"][op] = output[-4000:]  
 
     def mark_done(self, op: str, output: str = ""):
         s = self._state
@@ -544,7 +544,7 @@ class StateManager:
     def retry_count(self, op: str) -> int:
         return self._state["retries"].get(op, 0)
 
-    # ── queries ───────────────────────────────────────────────────────────────
+    
 
     @property
     def status(self) -> str:
@@ -591,7 +591,7 @@ class StateManager:
     def log(self) -> list:
         return list(self._state.get("log", []))
 
-    # ── internal ──────────────────────────────────────────────────────────────
+    
 
     def _log_entry(self, op: str, status: str, reason: str = "", duration: float = None):
         entry = {"op": op, "status": status, "reason": reason, "ts": time.time()}
@@ -610,5 +610,5 @@ class StateManager:
             "failed":      len(s["failed"]),
             "skipped":     len(s["skipped"]),
         })
-        # keep last 50 runs
+        
         self._state["history"] = self._state["history"][-50:]

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 gen.py — generate web/data.json from mend state files.
 Run from anywhere; paths are resolved relative to this file.
@@ -59,12 +59,12 @@ def _packages():
     except Exception:
         return {"count": 0, "sample": []}
 
-# ── assemble ──────────────────────────────────────────────────────────────────
+
 
 state   = _load(os.path.join(ROOT, "state.json"))
 wstate  = _load(os.path.join(ROOT, "watchdog.json"))
 
-# last backup
+
 lkg = state.get("last_known_good")
 last_backup = {
     "ts":       lkg["ts"]   if lkg else None,
@@ -75,7 +75,7 @@ last_backup = {
     "timer_active": _timer_active(),
 }
 
-# sync health
+
 snapshots = []
 if os.path.isdir(SNAPS):
     for name in sorted(os.listdir(SNAPS), reverse=True)[:10]:
@@ -87,10 +87,10 @@ sync = {
     "github_last_push": _gh_last_push(),
     "local_snapshots":  len(snapshots),
     "snapshots":        snapshots,
-    "external_targets": [],   # populated at runtime by state.external_targets
+    "external_targets": [],   
 }
 
-# system health
+
 results     = wstate.get("results", [])
 corrections = wstate.get("corrections", [])
 health = {
@@ -101,7 +101,7 @@ health = {
     "failed":     sum(1 for r in results if not r.get("ok")),
 }
 
-# recent errors / fixes from run history + corrections
+
 history = state.get("history", [])[-10:]
 errors  = [e for e in state.get("log", []) if e.get("status") == "failed"][-20:]
 

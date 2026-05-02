@@ -20,19 +20,19 @@ HOME        = os.path.expanduser("~")
 WATCH_STATE = os.path.join(os.path.dirname(__file__), "watchdog.json")
 SNAPSHOTS   = os.path.join(HOME, "backup", "snapshots")
 
-# Keys tracked for drift detection between cycles
+
 _DRIFT_KEYS = ("packages", "services", "mounts", "processes", "disk", "network")
 
 
-# ── data types ────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class HealthCheck:
     name: str
     description: str
-    check: Callable[[dict], tuple[bool, str]]   # (env) -> (ok, reason)
-    severity: str = "warn"                       # "warn" | "critical"
-    ai_correct: bool = False                     # ask Kiro to fix on failure
+    check: Callable[[dict], tuple[bool, str]]   
+    severity: str = "warn"                       
+    ai_correct: bool = False                     
     tags: list = field(default_factory=list)
 
 
@@ -47,7 +47,7 @@ class CheckResult:
     ts: float = field(default_factory=time.time)
 
 
-# ── rollback ──────────────────────────────────────────────────────────────────
+
 
 def _take_rollback_snapshot(label: str) -> str:
     """rsync / → SNAPSHOTS/<timestamp>-<label>/ before applying a correction."""
@@ -94,7 +94,7 @@ def list_snapshots() -> list[dict]:
     return entries
 
 
-# ── AI correction ─────────────────────────────────────────────────────────────
+
 
 def _kiro_correct(check: HealthCheck, reason: str, env: dict) -> tuple[bool, str]:
     """Ask Kiro CLI to fix a failed health check. Returns (fixed, log)."""
@@ -120,13 +120,13 @@ def _kiro_correct(check: HealthCheck, reason: str, env: dict) -> tuple[bool, str
     return r.returncode == 0, r.stdout.strip()[-2000:]
 
 
-# ── snapshot diffing ──────────────────────────────────────────────────────────
+
 
 def _diff_snapshots(prev: dict, curr: dict) -> list[str]:
     """Return human-readable list of meaningful changes between two env snapshots."""
     diffs = []
 
-    # packages added/removed
+    
     prev_pkgs = set(prev.get("packages", []))
     curr_pkgs = set(curr.get("packages", []))
     added   = curr_pkgs - prev_pkgs
@@ -134,13 +134,13 @@ def _diff_snapshots(prev: dict, curr: dict) -> list[str]:
     if added:   diffs.append(f"packages added: {', '.join(sorted(added)[:10])}")
     if removed: diffs.append(f"packages removed: {', '.join(sorted(removed)[:10])}")
 
-    # mounts changed
+    
     prev_mounts = set(prev.get("mounts", []))
     curr_mounts = set(curr.get("mounts", []))
     if prev_mounts != curr_mounts:
         diffs.append(f"mounts changed: +{curr_mounts - prev_mounts} -{prev_mounts - curr_mounts}")
 
-    # disk usage — flag if any mount crossed 90% used
+    
     for entry in curr.get("disk", []):
         pct = entry.get("use%", "0%").rstrip("%")
         try:
@@ -149,7 +149,7 @@ def _diff_snapshots(prev: dict, curr: dict) -> list[str]:
         except ValueError:
             pass
 
-    # memory — flag if available < 10% of total
+    
     mem = curr.get("memory", {})
     total = mem.get("total_mb", 0)
     avail = mem.get("available_mb", 0)
@@ -159,7 +159,7 @@ def _diff_snapshots(prev: dict, curr: dict) -> list[str]:
     return diffs
 
 
-# ── watchdog ──────────────────────────────────────────────────────────────────
+
 
 class Watchdog:
     """
@@ -170,18 +170,18 @@ class Watchdog:
     """
 
     def __init__(self, interval: int = 3600):
-        self.interval   = interval   # seconds between full check cycles
+        self.interval   = interval   
         self.checks: list[HealthCheck] = []
         self._state     = self._load()
         self._stop      = threading.Event()
         self._prev_env: Optional[dict] = None
 
-    # ── registration ─────────────────────────────────────────────────────────
+    
 
     def register(self, check: HealthCheck):
         self.checks.append(check)
 
-    # ── persistence ──────────────────────────────────────────────────────────
+    
 
     def _load(self) -> dict:
         if os.path.exists(WATCH_STATE):
@@ -193,13 +193,13 @@ class Watchdog:
         with open(WATCH_STATE, "w") as f:
             json.dump(self._state, f, indent=2)
 
-    # ── single cycle ─────────────────────────────────────────────────────────
+    
 
     def run_cycle(self, verbose: bool = True) -> list[CheckResult]:
         env = snapshot()
         results: list[CheckResult] = []
 
-        # drift detection
+        
         if self._prev_env:
             diffs = _diff_snapshots(self._prev_env, env)
             for d in diffs:
@@ -217,7 +217,7 @@ class Watchdog:
                     print(f"  {icon} {check.name}: {reason}")
 
                 if check.ai_correct:
-                    # snapshot before touching anything
+                    
                     snap_path = _take_rollback_snapshot(check.name)
                     if verbose:
                         print(f"     📸 rollback snapshot: {snap_path}")
@@ -250,7 +250,7 @@ class Watchdog:
         self._save()
         return results
 
-    # ── continuous loop ───────────────────────────────────────────────────────
+    
 
     def start(self, verbose: bool = True):
         """Run check cycles in a loop until stop() is called."""
@@ -268,7 +268,7 @@ class Watchdog:
     def stop(self):
         self._stop.set()
 
-    # ── status ────────────────────────────────────────────────────────────────
+    
 
     def status(self) -> dict:
         return {

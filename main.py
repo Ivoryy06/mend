@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 mend — state-aware system controller
 
@@ -22,14 +22,14 @@ HOME = os.path.expanduser("~")
 BACKUP_DIR = os.path.join(HOME, "backup")
 GITHUB_REPO_DIR = os.path.join(HOME, ".mend-backup-repo")
 
-# Paths excluded from rsync (virtual/ephemeral filesystems)
+
 RSYNC_EXCLUDES = [
     "--exclude=/proc/*", "--exclude=/sys/*", "--exclude=/dev/*",
     "--exclude=/run/*",  "--exclude=/tmp/*", "--exclude=/lost+found",
     "--exclude=/mnt/*",  "--exclude=/media/*",
 ]
 
-# Files/dirs pushed to GitHub (configs + dotfiles + package list)
+
 GITHUB_BACKUP_PATHS = [
     "/etc",
     os.path.join(HOME, ".config"),
@@ -40,7 +40,7 @@ GITHUB_BACKUP_PATHS = [
 ]
 
 
-# ── backup/recover operations ─────────────────────────────────────────────────
+
 
 def _make_backup_op() -> Operation:
     def action(env) -> str:
@@ -48,7 +48,7 @@ def _make_backup_op() -> Operation:
         cmd = ["rsync", "-aAXH", "--delete", "--info=progress2"] + RSYNC_EXCLUDES + ["/", BACKUP_DIR + "/"]
         r = subprocess.run(cmd, capture_output=True, text=True)
         out = (r.stdout + r.stderr).strip()[-4000:]
-        if r.returncode not in (0, 24):  # 24 = vanished files (ok)
+        if r.returncode not in (0, 24):  
             raise RuntimeError(f"rsync failed: {out}")
         return out
 
@@ -68,7 +68,7 @@ def _make_github_push_op() -> Operation:
     def action(env) -> str:
         logs = []
 
-        # 1. Ensure git is available (install if missing)
+        
         if not shutil.which("git"):
             logs.append("git not found — installing...")
             pkg_mgr = env.get("pkg_manager", "apt")
@@ -82,7 +82,7 @@ def _make_github_push_op() -> Operation:
                 raise RuntimeError(f"failed to install git: {r.stderr.strip()}")
             logs.append("git installed.")
 
-        # 2. Prefer gh CLI if available; install if not
+        
         use_gh = bool(shutil.which("gh"))
         if not use_gh:
             logs.append("gh CLI not found — installing...")
@@ -102,7 +102,7 @@ def _make_github_push_op() -> Operation:
             use_gh = r.returncode == 0 and bool(shutil.which("gh"))
             logs.append("gh installed." if use_gh else "gh install failed — falling back to git.")
 
-        # 3. Init repo dir and copy backup paths into it
+        
         os.makedirs(GITHUB_REPO_DIR, exist_ok=True)
         for src in GITHUB_BACKUP_PATHS:
             if not os.path.exists(src):
@@ -115,7 +115,7 @@ def _make_github_push_op() -> Operation:
             else:
                 shutil.copy2(src, dst)
 
-        # 4. Dump package list
+        
         pkg_mgr = env.get("pkg_manager", "apt")
         pkg_cmds = {
             "apt":    ["dpkg", "--get-selections"],
@@ -129,12 +129,12 @@ def _make_github_push_op() -> Operation:
         def git(args, cwd=GITHUB_REPO_DIR):
             return subprocess.run(["git"] + args, capture_output=True, text=True, cwd=cwd)
 
-        # 5. Init git repo if needed
+        
         if not os.path.isdir(os.path.join(GITHUB_REPO_DIR, ".git")):
             git(["init"])
             git(["checkout", "-b", "main"])
 
-        # 6. Create private GitHub repo if using gh and remote not set
+        
         remote = git(["remote", "get-url", "origin"]).stdout.strip()
         if not remote and use_gh:
             repo_name = "mend-system-backup"
@@ -150,7 +150,7 @@ def _make_github_push_op() -> Operation:
             logs.append("No remote set and gh not available — skipping push. Set origin manually.")
             return "\n".join(logs)
 
-        # 7. Commit and push
+        
         stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
         git(["add", "-A"])
         git(["commit", "-m", f"backup: {stamp}"])
@@ -247,7 +247,7 @@ WantedBy=timers.target
     )
 
 
-# ── default health checks ─────────────────────────────────────────────────────
+
 
 def build_watchdog(interval: int = 3600) -> Watchdog:
     wd = Watchdog(interval=interval)
@@ -313,7 +313,7 @@ def build_watchdog(interval: int = 3600) -> Watchdog:
     return wd
 
 
-# ── operation registry ────────────────────────────────────────────────────────
+
 
 def build_registry() -> Registry:
     reg = Registry()
@@ -351,8 +351,8 @@ def build_registry() -> Registry:
     return reg
 
 
-# ── task definitions with optional dependencies ───────────────────────────────
-# deps: ops that must complete before this task's ops run (resolved at runtime)
+
+
 
 TASKS: dict[str, dict] = {
     "Full Recovery": {
@@ -385,7 +385,7 @@ TASKS: dict[str, dict] = {
     },
 }
 
-# Collect all tags across all ops for the filter menu
+
 def _all_tags(reg: Registry) -> list:
     tags = set()
     for op in reg.all():
@@ -393,7 +393,7 @@ def _all_tags(reg: Registry) -> list:
     return sorted(tags)
 
 
-# ── dependency resolution ─────────────────────────────────────────────────────
+
 
 def _resolve_ops(task_name: str, reg: Registry) -> list:
     """Return ordered op list for a task, prepending dep-task ops if needed."""
@@ -409,7 +409,7 @@ def _resolve_ops(task_name: str, reg: Registry) -> list:
     return [reg.get(n) for n in op_names]
 
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+
 
 def drop_to_shell():
     print("\n[escape hatch] dropping to shell — type 'exit' to return\n")
@@ -435,7 +435,7 @@ def _status_line(state: StateManager) -> str:
             f"{s['elapsed']}s")
 
 
-# ── run a task ────────────────────────────────────────────────────────────────
+
 
 def run_task(task_name: str, reg: Registry, state: StateManager,
              logger: Logger, dry_run: bool, interactive: bool = True):
@@ -464,7 +464,7 @@ def run_task(task_name: str, reg: Registry, state: StateManager,
     return ok
 
 
-# ── main ──────────────────────────────────────────────────────────────────────
+
 
 def main():
     parser = argparse.ArgumentParser(prog="mend", add_help=True)
@@ -498,7 +498,7 @@ def main():
 
     if args.rollback:
         import glob as _glob
-        # allow partial name match
+        
         snaps = list_snapshots()
         match = next((s for s in snaps if args.rollback in s["name"]), None)
         if not match:
@@ -525,7 +525,7 @@ def main():
     state = StateManager()
     logger = Logger()
 
-    # register external sync targets
+    
     for target in args.external:
         state.external_targets.append(target)
 
@@ -544,7 +544,7 @@ def main():
         ok = run_task(args.task, reg, state, logger, dry_run=args.dry_run, interactive=False)
         sys.exit(0 if ok else 1)
 
-    # ── interactive UI ────────────────────────────────────────────────────────
+    
 
     if state.is_interrupted:
         choice = Menu(
@@ -579,7 +579,7 @@ def main():
         elif choice == "── View log":
             logger.show(state.summary())
         elif choice == "── History":
-            # show history in log viewer style
+            
             hist_logger = Logger()
             for h in state.history():
                 import datetime
@@ -610,7 +610,7 @@ def main():
         elif choice in TASKS:
             ok = run_task(choice, reg, state, logger,
                           dry_run=args.dry_run, interactive=True)
-            # brief result shown in status line on next menu render
+            
 
 
 if __name__ == "__main__":

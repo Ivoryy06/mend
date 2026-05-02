@@ -25,7 +25,7 @@ def _read(path: str) -> str:
         return ""
 
 
-# ── OS / kernel ───────────────────────────────────────────────────────────────
+
 
 def _os_info() -> dict:
     info = {
@@ -43,7 +43,7 @@ def _os_info() -> dict:
                     or _read("/etc/timezone"),
         "users_logged_in": _run(["who"]),
     }
-    # pretty distro from /etc/os-release
+    
     for line in _read("/etc/os-release").splitlines():
         if line.startswith("PRETTY_NAME="):
             info["distro"] = line.split("=", 1)[1].strip('"')
@@ -61,7 +61,7 @@ def _detect_init() -> str:
     return "unknown"
 
 
-# ── CPU ───────────────────────────────────────────────────────────────────────
+
 
 def _cpu_info() -> dict:
     info = {"model": "", "cores_physical": 0, "cores_logical": 0, "freq_mhz": 0, "load": []}
@@ -71,23 +71,23 @@ def _cpu_info() -> dict:
             info["model"] = line.split(":", 1)[1].strip()
         if line.startswith("processor"):
             info["cores_logical"] += 1
-    # physical cores
+    
     siblings = re.findall(r"^siblings\s+:\s+(\d+)", cpuinfo, re.M)
     cpu_cores = re.findall(r"^cpu cores\s+:\s+(\d+)", cpuinfo, re.M)
     if cpu_cores:
         info["cores_physical"] = int(cpu_cores[0])
-    # current freq
+    
     freq = _read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq")
     if freq:
         info["freq_mhz"] = round(int(freq) / 1000)
-    # load average
+    
     loadavg = _read("/proc/loadavg").split()
     if loadavg:
         info["load"] = [float(x) for x in loadavg[:3]]
     return info
 
 
-# ── memory ────────────────────────────────────────────────────────────────────
+
 
 def _mem_info() -> dict:
     info = {"total_mb": 0, "available_mb": 0, "used_mb": 0, "free_mb": 0,
@@ -108,7 +108,7 @@ def _mem_info() -> dict:
     return info
 
 
-# ── disk ──────────────────────────────────────────────────────────────────────
+
 
 def _mounts() -> list:
     out = _run(["findmnt", "-rn", "-o", "TARGET"])
@@ -148,16 +148,16 @@ def _disk_usage() -> list:
     return rows
 
 
-# ── GPU ───────────────────────────────────────────────────────────────────────
+
 
 def _gpu_info() -> list:
     gpus = []
-    # lspci
+    
     out = _run(["lspci"])
     for line in out.splitlines():
         if any(k in line.lower() for k in ("vga", "3d", "display", "gpu")):
             gpus.append({"name": line.split(":", 2)[-1].strip(), "driver": ""})
-    # nvidia-smi
+    
     nsmi = _run(["nvidia-smi", "--query-gpu=name,driver_version,memory.total,temperature.gpu",
                  "--format=csv,noheader"])
     if nsmi:
@@ -169,11 +169,11 @@ def _gpu_info() -> list:
     return gpus
 
 
-# ── temperatures ──────────────────────────────────────────────────────────────
+
 
 def _temperatures() -> dict:
     temps = {}
-    # sensors (lm-sensors)
+    
     out = _run(["sensors", "-j"], timeout=3)
     if out:
         try:
@@ -186,7 +186,7 @@ def _temperatures() -> dict:
                             temps[f"{chip}/{sensor}"] = v
         except Exception:
             pass
-    # fallback: /sys/class/thermal
+    
     thermal = "/sys/class/thermal"
     if os.path.isdir(thermal):
         for zone in os.listdir(thermal):
@@ -199,7 +199,7 @@ def _temperatures() -> dict:
     return temps
 
 
-# ── battery ───────────────────────────────────────────────────────────────────
+
 
 def _battery() -> dict:
     ps = "/sys/class/power_supply"
@@ -219,7 +219,7 @@ def _battery() -> dict:
     return {}
 
 
-# ── display ───────────────────────────────────────────────────────────────────
+
 
 def _display_info() -> dict:
     return {
@@ -233,7 +233,7 @@ def _display_info() -> dict:
     }
 
 
-# ── network ───────────────────────────────────────────────────────────────────
+
 
 def _network_interfaces() -> list:
     out = _run(["ip", "-br", "addr"])
@@ -261,7 +261,7 @@ def _dns_servers() -> list:
             if l.startswith("nameserver") and len(l.split()) >= 2]
 
 
-# ── packages ──────────────────────────────────────────────────────────────────
+
 
 def _detect_pkg_manager() -> str:
     for m in ("pacman", "apt", "dnf", "zypper", "apk"):
@@ -284,7 +284,7 @@ def _installed_packages(manager: str) -> list:
     return [l.split()[0] for l in out.splitlines() if l]
 
 
-# ── services ──────────────────────────────────────────────────────────────────
+
 
 def _service_status(services: list) -> dict:
     if not shutil.which("systemctl"):
@@ -296,14 +296,14 @@ def _service_status(services: list) -> dict:
     return result
 
 
-# ── processes ─────────────────────────────────────────────────────────────────
+
 
 def _process_list() -> list:
     out = _run(["ps", "-eo", "comm="])
     return list(dict.fromkeys(l.strip() for l in out.splitlines() if l.strip()))
 
 
-# ── config hashing ────────────────────────────────────────────────────────────
+
 
 def hash_file(path: str) -> Optional[str]:
     try:
@@ -333,7 +333,7 @@ def check_file(path: str) -> dict:
     }
 
 
-# ── main snapshot ─────────────────────────────────────────────────────────────
+
 
 def snapshot(services: list = None) -> dict:
     pkg_mgr = _detect_pkg_manager()

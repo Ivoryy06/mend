@@ -17,11 +17,11 @@ import subprocess, os, shutil, threading, time
 
 Env = dict
 Check = Callable[[Env], Tuple[bool, str]]
-Action = Callable[[Env], str]   # returns captured output string
+Action = Callable[[Env], str]   
 
-# DeepValidate: optional callable that receives (env, op_output) and returns
-# (ok: bool, reason: str, verdict: str)
-# verdict must be one of: "done" | "retry" | "reapply" | "reinstall"
+
+
+
 DeepValidate = Callable[[Env, str], Tuple[bool, str, str]]
 
 
@@ -32,15 +32,15 @@ class Operation:
     preconditions: List[Check]
     action: Action
     postconditions: List[Check]
-    failure_class: str = "recoverable"   # 'system' | 'external' | 'recoverable'
+    failure_class: str = "recoverable"   
     max_retries: int = 2
     tags: List[str] = field(default_factory=list)
-    timeout: Optional[int] = None        # seconds; None = no limit
-    parallel: bool = False               # safe for concurrent execution
-    deep_validate: Optional[DeepValidate] = None  # AI-driven deep validation
+    timeout: Optional[int] = None        
+    parallel: bool = False               
+    deep_validate: Optional[DeepValidate] = None  
 
 
-# ── subprocess helpers ────────────────────────────────────────────────────────
+
 
 def _run(args: list, timeout: int = None) -> tuple[bool, str]:
     """Run a command, return (success, combined_output)."""
@@ -75,7 +75,7 @@ def _service_active(svc: str) -> Check:
     )
 
 
-# ── factory functions ─────────────────────────────────────────────────────────
+
 
 def make_mount_op(name: str, device: str, mountpoint: str, fatal=True) -> Operation:
     def action(env) -> str:
@@ -211,7 +211,7 @@ def make_service_op(name: str, service: str, ensure: str = "active",
     )
 
 
-# ── AI deep validation ────────────────────────────────────────────────────────
+
 
 def make_ai_validator(context: str) -> "DeepValidate":
     """
@@ -226,7 +226,7 @@ def make_ai_validator(context: str) -> "DeepValidate":
     def validator(env: dict, op_output: str) -> tuple[bool, str, str]:
         kiro = shutil.which("kiro-cli")
         if not kiro:
-            # no Kiro available — pass through
+            
             return True, "kiro-cli not available, skipping deep validation", "done"
 
         mend_dir = os.path.dirname(os.path.abspath(__file__))
@@ -259,7 +259,7 @@ def make_ai_validator(context: str) -> "DeepValidate":
             capture_output=True, text=True, cwd=mend_dir,
         )
 
-        # extract the last JSON line from Kiro's output
+        
         for line in reversed(result.stdout.strip().splitlines()):
             line = line.strip()
             if line.startswith("{") and line.endswith("}"):
@@ -274,13 +274,13 @@ def make_ai_validator(context: str) -> "DeepValidate":
                 except _json.JSONDecodeError:
                     continue
 
-        # Kiro returned something unparseable — treat as pass
+        
         return True, "deep validation response unparseable, assuming ok", "done"
 
     return validator
 
 
-# ── multi-pass app testing ────────────────────────────────────────────────────
+
 
 def make_app_test_op(
     name: str,
@@ -321,7 +321,7 @@ def make_app_test_op(
             missing = [s for s in expect_in_output if s not in combined]
             if missing:
                 return f"expected output missing: {missing}"
-        # heuristic: common crash/error patterns in output
+        
         for pattern in ("segfault", "core dumped", "killed", "error:", "fatal:", "exception"):
             if pattern in combined.lower():
                 return f"misbehavior detected in output: '{pattern}'"
@@ -373,10 +373,10 @@ def make_app_test_op(
         try:
             stdout, stderr = proc.communicate(timeout=run_for)
         except subprocess.TimeoutExpired:
-            # still running after run_for seconds — that's expected for daemons
+            
             proc.kill()
             stdout, stderr = proc.communicate()
-            proc.returncode = 0  # treat timeout as "ran without crashing"
+            proc.returncode = 0  
 
         error = _detect_misbehavior(proc, stdout, stderr)
 
@@ -396,7 +396,7 @@ def make_app_test_op(
                 f"stdout: {stdout[-500:]}\nstderr: {stderr[-500:]}"
             )
 
-        _counter["errors"] = 0  # clean pass resets counter
+        _counter["errors"] = 0  
         return (
             f"app test passed (errors reset to 0, reinstalled={_counter['reinstalled']})\n"
             f"stdout: {stdout[:500]}"
@@ -414,7 +414,7 @@ def make_app_test_op(
     )
 
 
-# ── registry ──────────────────────────────────────────────────────────────────
+
 
 class Registry:
     def __init__(self):
